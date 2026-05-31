@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 아크릴 스탠드 메이커</title>
+    <!-- Three.js (r128) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- GLTFExporter -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
+    <!-- GIF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+    <!-- UPNG.js & Pako -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app-layout">
+    <div id="canvas-wrapper">
+        <canvas id="main-canvas" width="800" height="800"></canvas>
+        <div id="loading-overlay">
+            <div class="spinner"></div>
+            <p id="loading-text" class="loading-text">처리 중입니다...</p>
+        </div>
+    </div>
+
+    <div id="ui-panel">
+        <div>
+            <div class="header-wrap">
+                <h1 class="header-title">아크릴 스탠드 메이커</h1>
+                <button id="btnInfo" class="btn-info" title="라이선스 정보">i</button>
+            </div>
+            <span class="text-muted">사이버 3D 굿즈를 만들어보세요.</span>
+        </div>
+        
+        <div class="control-group">
+            <label>앞면 이미지 (PNG)</label>
+            <input type="file" id="imageInput" accept="image/png">
+        </div>
+
+        <div class="control-group">
+            <label>뒷면 이미지 (선택, PNG)</label>
+            <div class="flex gap-2 items-center">
+                <input type="file" id="imageBackInput" accept="image/png">
+                <button id="btnClearBack" class="btn-danger">제거</button>
+            </div>
+            <span class="text-muted text-warning">※ 자동 위치 맞춤 적용</span>
+        </div>
+
+        <div class="control-group panel-box">
+            <label>배경 및 투명도</label>
+            <div class="flex gap-4 items-center mt-2">
+                <input type="color" id="bgColor" value="#eef1f5">
+                <label class="flex items-center gap-2 cursor-pointer mb-0" style="margin-bottom:0;">
+                    <input type="checkbox" id="bgTransparent">
+                    배경 투명화 적용
+                </label>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>외곽선 설정</label>
+            <select id="contourMode">
+                <option value="unified">앞면 외곽선으로 통합</option>
+                <option value="separate">앞/뒷면 다른 외곽선 사용</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>그림 표면 질감</label>
+            <select id="textureType">
+                <option value="matte">무광</option>
+                <option value="glossy">유광</option>
+            </select>
+        </div>
+
+        <div class="flex gap-4">
+            <div class="control-group flex-1">
+                <label>두께: <span id="valThickness">20</span>px</label>
+                <input type="range" id="thickness" min="5" max="50" value="20">
+            </div>
+            <div class="control-group flex-1">
+                <label>여백: <span id="valMargin">15</span>px</label>
+                <input type="range" id="margin" min="0" max="50" value="15">
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>스탠드 옵션</label>
+            <select id="pivotType">
+                <option value="bottom">받침대 추가</option>
+                <option value="center">이미지만</option>
+            </select>
+        </div>
+
+        <!-- 바닥 옵션 패널 -->
+        <div id="baseOptionsPanel" class="control-group panel-box">
+            <label>받침대 옵션</label>
+            
+            <span class="text-muted mb-2">받침대 모양</span>
+            <select id="baseShapeType" class="mb-2">
+                <option value="circle">원형</option>
+                <option value="square">사각형</option>
+                <option value="contour">이미지에 맞춤</option>
+            </select>
+
+            <div id="baseSizeContainer">
+                <span class="text-muted mb-2">받침대 크기: <span id="valBaseSize">150</span>px</span>
+                <input type="range" id="baseSize" min="50" max="400" value="150" class="mb-2">
+            </div>
+
+            <span class="text-muted mb-2">바닥 이미지 (선택, PNG)</span>
+            <div class="flex gap-2 items-center">
+                <input type="file" id="imageBaseInput" accept="image/png">
+                <button id="btnClearBase" class="btn-danger">제거</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>자동 회전 속도</label>
+            <input type="range" id="rotationSpeed" min="0" max="10" value="0">
+        </div>
+
+        <!-- 조명 설정 패널 -->
+        <div class="control-group panel-box">
+            <div class="flex items-center" style="justify-content: space-between;">
+                <label style="margin: 0;">조명 설정</label>
+                <button id="btnResetLight" class="btn-gray" style="width: auto; padding: 4px 8px; font-size: 11px; margin: 0; box-shadow: none;">초기화</button>
+            </div>
+            <div class="flex gap-4 items-center mt-2">
+                <div id="lightControlPad" class="light-pad" title="클릭하고 드래그하여 조명 위치 변경">
+                    <div id="lightHandle" class="light-handle"></div>
+                </div>
+                <div class="flex-1">
+                    <label class="text-muted">메인 조명 밝기</label>
+                    <input type="range" id="lightIntensity" min="0" max="2" step="0.1" value="0.5">
+                    <label class="text-muted mt-2">주변광 (그림자 밝기)</label>
+                    <input type="range" id="ambientIntensity" min="0" max="2" step="0.1" value="0.6">
+                </div>
+            </div>
+        </div>
+
+        <hr>
+
+        <div class="flex gap-3">
+            <button id="btnGenerate" class="btn-primary flex-2">입체 아크릴 갱신</button>
+            <button id="btnResetCamera" class="btn-gray flex-1">초점 초기화</button>
+        </div>
+        
+        <div class="control-group gap-2">
+            <button id="btnExportVideo" class="btn-green" disabled>WebM 영상 저장</button>
+            <button id="btnExportAPNG" class="btn-blue" disabled>APNG 저장</button>
+            <button id="btnExportGIF" class="btn-purple" disabled>GIF 저장</button>
+        </div>
+        
+        <div class="control-group panel-box mt-2">
+            <button id="btnExportGLTF" class="btn-yellow" disabled>3D 모델 파일 저장 (.glb)</button>
+            <span class="text-muted text-warning mt-2">
+                ※ 주의: '앞/뒷면 다른 외곽선 사용' 옵션을 선택한 경우, 앞/뒷면 표시 전환이 정상적으로 작동하지 않을 수 있습니다.
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- 라이선스 모달 -->
+<div id="licenseModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>오픈소스 라이선스</h2>
+            <button id="btnCloseModal" class="btn-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>본 프로그램은 다음의 오픈소스 라이브러리를 사용하고 있습니다.</p>
+            <div class="license-item">
+                <strong>Three.js</strong> (MIT License)<br>Copyright © 2010-2023 three.js authors
+            </div>
+            <div class="license-item">
+                <strong>OrbitControls</strong> (MIT License)<br>Copyright © 2010-2023 three.js authors
+            </div>
+            <div class="license-item">
+                <strong>GLTFExporter</strong> (MIT License)<br>Copyright © 2010-2023 three.js authors
+            </div>
+            <div class="license-item">
+                <strong>GIF.js</strong> (MIT License)<br>Copyright © 2013 Johan Nordberg
+            </div>
+            <div class="license-item">
+                <strong>UPNG.js</strong> (MIT License)<br>Copyright © 2017 Photopea
+            </div>
+            <div class="license-item">
+                <strong>Pako</strong> (MIT License)<br>Copyright © 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
